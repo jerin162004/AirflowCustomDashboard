@@ -118,10 +118,15 @@ class EmailService:
             part_html = MIMEText(html_content, "html")
             msg.attach(part_html)
 
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-                server.starttls()
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.sendmail(settings.SMTP_USER, settings.ALERT_RECIPIENT_EMAILS, msg.as_string())
+            if settings.SMTP_PORT == 465:
+                with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+                    server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                    server.sendmail(settings.SMTP_USER, settings.ALERT_RECIPIENT_EMAILS, msg.as_string())
+            else:
+                with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+                    server.starttls()
+                    server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                    server.sendmail(settings.SMTP_USER, settings.ALERT_RECIPIENT_EMAILS, msg.as_string())
 
             self.mark_notified(dag_id, dag_run_id)
             logger.info(f"Successfully sent failure alert email for DAG '{dag_id}' to {settings.ALERT_RECIPIENT_EMAILS}")

@@ -50,9 +50,23 @@ export function DagTable({
     }
   };
 
-  const handleCopyDagId = (dagId) => {
+  const handleCopyDagId = async (dagId) => {
     try {
-      navigator.clipboard.writeText(dagId);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(dagId);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = dagId;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+      }
+
       setCopiedDagId(dagId);
       if (onToast) {
         onToast({ type: 'success', message: `Copied "${dagId}" to clipboard!` });
@@ -60,6 +74,9 @@ export function DagTable({
       setTimeout(() => setCopiedDagId(null), 2000);
     } catch (e) {
       console.error('Clipboard copy failed:', e);
+      if (onToast) {
+        onToast({ type: 'error', message: `Failed to copy DAG ID: ${dagId}` });
+      }
     }
   };
 
@@ -130,12 +147,15 @@ export function DagTable({
                           {dag.dag_id}
                         </span>
                         <button
-                          onClick={() => handleCopyDagId(dag.dag_id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-cyan-500"
-                          title="Copy DAG ID"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyDagId(dag.dag_id);
+                          }}
+                          className="opacity-70 group-hover:opacity-100 hover:scale-110 p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-cyan-500 transition-all"
+                          title={`Click to copy DAG ID "${dag.dag_id}"`}
                         >
                           {copiedDagId === dag.dag_id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <Check className="w-3.5 h-3.5 text-emerald-500 animate-bounce" />
                           ) : (
                             <Copy className="w-3.5 h-3.5" />
                           )}

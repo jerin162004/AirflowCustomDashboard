@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings:
-    AIRFLOW_BASE_URL: str = os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080/api/v2")
-    AIRFLOW_USER: str = os.getenv("AIRFLOW_USER", "airflow")
-    AIRFLOW_PASSWORD: str = os.getenv("AIRFLOW_PASSWORD", "airflow")
+    AIRFLOW_BASE_URL: str = os.getenv("AIRFLOW_BASE_URL", "https://34.18.120.148:8080/api/v2")
+    AIRFLOW_USER: str = os.getenv("AIRFLOW_USER", "MT_AIRFLOW_USER")
+    AIRFLOW_PASSWORD: str = os.getenv("AIRFLOW_PASSWORD", "MT26@Project")
     CACHE_TTL_SECONDS: float = float(os.getenv("CACHE_TTL_SECONDS", "15"))
     USE_MOCK_FALLBACK: bool = os.getenv("USE_MOCK_FALLBACK", "True").lower() == "true"
     AIRFLOW_VERIFY_SSL: bool = os.getenv("AIRFLOW_VERIFY_SSL", "False").lower() == "true"
