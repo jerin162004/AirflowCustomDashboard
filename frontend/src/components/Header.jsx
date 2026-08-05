@@ -14,7 +14,7 @@ export function Header({
   onOpenChatOps
 }) {
   return (
-    <header className="sticky top-0 z-30 glass-header px-6 py-4 transition-colors duration-200">
+    <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/90 px-6 py-3.5 transition-colors duration-200 shadow-xl shadow-slate-950/20">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         
         {/* Left: Brand & Airflow Version Badge */}
