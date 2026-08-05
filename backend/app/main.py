@@ -14,6 +14,7 @@ from .schemas import (
     TriggerDagRequest,
     StopDagRequest,
     DiagnoseRequest,
+    DiagnosisChatRequest,
     ChatOpsRequest,
     ChatOpsResponse,
     ActionResponse
@@ -141,6 +142,25 @@ async def diagnose_failure(
     logs_text, error_detail = await airflow_client.fetch_dag_run_logs(dag_id, req.dag_run_id)
     diagnosis = ai_service.diagnose_failure(dag_id, req.dag_run_id, logs_text, error_detail)
     return diagnosis
+
+@app.post("/api/dags/{dag_id}/chat-followup", summary="Interactive AI Diagnosis Follow-Up Chat")
+async def process_diagnosis_chat(
+    dag_id: str = Path(..., description="The DAG identifier"),
+    req: DiagnosisChatRequest = Body(...)
+):
+    """
+    Handles follow-up troubleshooting questions inside the AI Diagnosis Modal.
+    Passes error log context to Gemini AI LLM engine for SQL generation or code fixes.
+    """
+    logs_text, _ = await airflow_client.fetch_dag_run_logs(dag_id, req.dag_run_id)
+    chat_res = await ai_service.process_diagnosis_followup_chat(
+        dag_id=dag_id,
+        dag_run_id=req.dag_run_id,
+        prompt=req.prompt,
+        logs=logs_text,
+        history=req.history
+    )
+    return chat_res
 
 @app.post("/api/chatops/command", response_model=ChatOpsResponse, summary="Natural Language ChatOps Command Assistant")
 async def process_chatops_command(

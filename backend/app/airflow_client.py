@@ -266,7 +266,7 @@ class AirflowClient:
     async def fetch_dag_run_logs(self, dag_id: str, dag_run_id: str = None) -> Tuple[str, str]:
         """Proxy call to Airflow REST API to retrieve task execution logs or error detail."""
         try:
-            async with httpx.AsyncClient(timeout=5.0, verify=settings.AIRFLOW_VERIFY_SSL) as client:
+            async with httpx.AsyncClient(timeout=1.5, verify=settings.AIRFLOW_VERIFY_SSL) as client:
                 headers, auth = await self._get_auth_params(client)
 
                 target_run_id = dag_run_id

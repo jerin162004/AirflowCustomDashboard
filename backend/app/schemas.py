@@ -58,3 +58,8 @@ class ChatOpsResponse(BaseModel):
     message: str
     target_dag_id: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
+
+class DiagnosisChatRequest(BaseModel):
+    dag_run_id: Optional[str] = None
+    prompt: str
+    history: Optional[List[Dict[str, str]]] = Field(default_factory=list)

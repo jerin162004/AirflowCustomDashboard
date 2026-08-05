@@ -1,5 +1,5 @@
-import React from 'react';
-import { Sparkles, AlertTriangle, CheckCircle2, ShieldAlert, X, Play, RefreshCw, Terminal } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, AlertTriangle, CheckCircle2, ShieldAlert, X, Play, Send, Terminal, MessageSquare, Code, Copy } from 'lucide-react';
 
 export function AiDiagnosisModal({ 
   isOpen, 
@@ -9,19 +9,77 @@ export function AiDiagnosisModal({
   onReTrigger,
   onToast 
 }) {
+  const [chatMessages, setChatMessages] = useState([]);
+  const [inputPrompt, setInputPrompt] = useState('');
+  const [loadingChat, setLoadingChat] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setChatMessages([]);
+      setInputPrompt('');
+    }
+  }, [isOpen, diagnosis]);
+
   if (!isOpen) return null;
 
   const isHighSeverity = diagnosis?.severity === 'HIGH' || diagnosis?.severity === 'CRITICAL';
 
+  const handleSendChat = async (targetText = inputPrompt) => {
+    const q = targetText.trim();
+    if (!q || loadingChat || !diagnosis?.dag_id) return;
+
+    const userMsg = { sender: 'user', text: q };
+    setChatMessages(prev => [...prev, userMsg]);
+    setInputPrompt('');
+    setLoadingChat(true);
+
+    try {
+      const res = await fetch(`/api/dags/${encodeURIComponent(diagnosis.dag_id)}/chat-followup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dag_run_id: diagnosis.dag_run_id,
+          prompt: q
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setChatMessages(prev => [...prev, {
+          sender: 'ai',
+          text: json.answer,
+          model: json.ai_model
+        }]);
+      } else {
+        setChatMessages(prev => [...prev, {
+          sender: 'ai',
+          text: 'Failed to get answer for this follow-up query.'
+        }]);
+      }
+    } catch (err) {
+      setChatMessages(prev => [...prev, {
+        sender: 'ai',
+        text: 'Error communicating with AI follow-up assistant.'
+      }]);
+    } finally {
+      setLoadingChat(false);
+    }
+  };
+
+  const suggestions = [
+    'Give me SQL migration command to fix this',
+    'How do I test this DAG locally?',
+    'Explain the root cause in simple terms'
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
-      <div className="glass-panel w-full max-w-2xl rounded-3xl p-6 shadow-2xl border border-cyan-500/30 bg-slate-900/90 text-slate-100 relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-fade-in">
+      <div className="glass-panel w-full max-w-2xl rounded-3xl p-6 shadow-2xl border border-cyan-500/30 bg-slate-900/95 text-slate-100 relative overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Decorative Top Ambient Glow Bar */}
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 animate-pulse" />
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
               <Sparkles className="w-6 h-6 animate-pulse" />
@@ -44,15 +102,15 @@ export function AiDiagnosisModal({
           </button>
         </div>
 
-        {/* Modal Body Content */}
+        {/* Modal Body Content (Scrollable) */}
         {loading ? (
-          <div className="py-16 text-center">
+          <div className="py-16 text-center shrink-0">
             <div className="inline-block w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-sm font-semibold text-slate-300">Retrieving task logs & analyzing stack trace...</p>
             <p className="text-xs text-slate-500 mt-1">Extracting root cause & remediation steps</p>
           </div>
         ) : diagnosis ? (
-          <div className="py-5 space-y-4">
+          <div className="py-4 space-y-4 overflow-y-auto pr-1 flex-1">
             
             {/* Root Cause Banner */}
             <div className={`p-4 rounded-2xl border flex items-start space-x-3.5 ${
@@ -89,11 +147,86 @@ export function AiDiagnosisModal({
               </div>
             </div>
 
+            {/* Interactive AI Follow-Up Chat Thread Section */}
+            <div className="p-4 rounded-2xl bg-slate-950/90 border border-cyan-500/30 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1.5">
+                  <MessageSquare className="w-4 h-4 text-cyan-400" />
+                  <span>Ask AI Follow-Up Question</span>
+                </h5>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {diagnosis.ai_model || 'Gemini AI'}
+                </span>
+              </div>
+
+              {/* Chat Thread Messages */}
+              {chatMessages.length > 0 && (
+                <div className="space-y-2.5 max-h-48 overflow-y-auto p-2 rounded-xl bg-slate-900/40 border border-slate-800/60">
+                  {chatMessages.map((m, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-[88%] p-3 rounded-2xl text-xs leading-relaxed ${
+                        m.sender === 'user'
+                          ? 'bg-cyan-500/20 text-cyan-100 border border-cyan-500/30 font-medium'
+                          : 'bg-slate-900 text-slate-200 border border-slate-800 font-mono whitespace-pre-line'
+                      }`}>
+                        <div className="flex items-center justify-between text-[10px] opacity-60 mb-1 font-sans">
+                          <strong>{m.sender === 'user' ? 'You' : 'AI Assistant'}</strong>
+                          {m.model && <span>{m.model}</span>}
+                        </div>
+                        <p>{m.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Suggestion Prompt Chips */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Try:</span>
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSendChat(s)}
+                    className="text-[11px] font-medium px-2.5 py-1 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white transition active:scale-95"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chat Input Bar */}
+              <div className="flex items-center space-x-2 pt-1">
+                <input
+                  type="text"
+                  value={inputPrompt}
+                  onChange={(e) => setInputPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+                  placeholder="Ask follow-up question (e.g. 'Give me SQL migration command')..."
+                  className="flex-1 bg-slate-900 text-xs text-slate-100 placeholder-slate-500 p-2.5 rounded-xl border border-slate-800 focus:border-cyan-500/60 focus:outline-none font-medium"
+                />
+                <button
+                  onClick={() => handleSendChat()}
+                  disabled={loadingChat || !inputPrompt.trim()}
+                  className="p-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/30 disabled:opacity-40 transition active:scale-95"
+                  title="Send follow-up question"
+                >
+                  {loadingChat ? (
+                    <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
           </div>
         ) : null}
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-2">
+        <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-2 shrink-0">
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition"

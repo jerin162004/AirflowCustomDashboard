@@ -20,20 +20,69 @@ class AIService:
         if not settings.GEMINI_API_KEY:
             return None
         
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key={settings.GEMINI_API_KEY}"
-            payload = {"contents": [{"parts": [{"text": prompt}]}]}
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                r = await client.post(url, json=payload)
-                if r.status_code == 200:
-                    data = r.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                        return text
-        except Exception as e:
-            logger.warning(f"Gemini API call failed, falling back to local engine: {e}")
+        for model_name in ["gemini-2.0-flash", "gemini-2.0-flash-lite-001", "gemma-4-31b-it"]:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
+                payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                async with httpx.AsyncClient(timeout=1.5) as client:
+                    r = await client.post(url, json=payload)
+                    if r.status_code == 200:
+                        data = r.json()
+                        candidates = data.get("candidates", [])
+                        if candidates:
+                            text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                            if text.strip():
+                                return text.strip()
+            except Exception as e:
+                logger.warning(f"Gemini model {model_name} call failed/timed out: {e}")
         return None
+
+    async def process_diagnosis_followup_chat(
+        self,
+        dag_id: str,
+        dag_run_id: Optional[str],
+        prompt: str,
+        logs: str = "",
+        history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Handles interactive follow-up questions inside the AI Diagnosis Modal.
+        Uses Google Gemini LLM API (or precision fallback engine) with error log context.
+        """
+        clean_prompt = prompt.strip()
+        p_lower = clean_prompt.lower()
+
+        # Build prompt for Gemini LLM if API Key is available
+        if settings.GEMINI_API_KEY:
+            llm_context = f"You are an Airflow & SQL Database Assistant. The user is troubleshooting a failed DAG '{dag_id}'.\nTask Log Snippet:\n{logs[:1500]}\n\nUser Question: {clean_prompt}\nProvide a direct, helpful answer (including SQL queries or Python code snippets if requested)."
+            llm_ans = await self._query_gemini_api(llm_context)
+            if llm_ans:
+                return {
+                    "success": True,
+                    "answer": llm_ans,
+                    "dag_id": dag_id,
+                    "ai_model": "Google Gemini (Gemma-4)"
+                }
+
+        # Rule-based intelligent fallback for common follow-up queries
+        if any(w in p_lower for w in ["sql", "alter", "add column", "create column", "table"]):
+            column_match = re.search(r'column ["\']?([a-zA-Z0-9_\-]+)["\']?', logs, re.IGNORECASE)
+            relation_match = re.search(r'relation ["\']?([a-zA-Z0-9_\.]+)["\']?', logs, re.IGNORECASE)
+            col = column_match.group(1) if column_match else "hotelid"
+            rel = relation_match.group(1) if relation_match else "stg.priceline_hotels_search_stg"
+            
+            ans = f"To fix the missing column in PostgreSQL, run this SQL migration command in your database client:\n\n```sql\nALTER TABLE {rel} ADD COLUMN {col} VARCHAR(255);\n```\n\nAfter altering the table, re-trigger the DAG to verify the migration."
+        elif any(w in p_lower for w in ["how to fix", "fix this", "remediate", "solution"]):
+            ans = f"Here is the recommended troubleshooting checklist for '{dag_id}':\n1. Verify column/table schemas match upstream API payloads.\n2. Inspect the latest task instance logs for execution timeouts.\n3. Click 'Re-trigger DAG Now' once schemas or environment secrets are updated."
+        else:
+            ans = f"For DAG '{dag_id}', ensure all database migration scripts and connection credentials are verified before re-triggering task instance."
+
+        return {
+            "success": True,
+            "answer": ans,
+            "dag_id": dag_id,
+            "ai_model": "Local Precision Engine"
+        }
 
     async def diagnose_failure_async(
         self, 
