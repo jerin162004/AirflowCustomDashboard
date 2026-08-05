@@ -13,6 +13,16 @@ class Settings:
     AIRFLOW_VERIFY_SSL: bool = os.getenv("AIRFLOW_VERIFY_SSL", "False").lower() == "true"
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
+    # Email Failure Alerting Settings
+    ENABLE_EMAIL_ALERTS: bool = os.getenv("ENABLE_EMAIL_ALERTS", "False").lower() == "true"
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    ALERT_RECIPIENT_EMAILS: list = [
+        e.strip() for e in os.getenv("ALERT_RECIPIENT_EMAILS", "").split(",") if e.strip()
+    ]
+
     # Frontend CORS origins
     CORS_ORIGINS: list = [
         "http://localhost:5173",

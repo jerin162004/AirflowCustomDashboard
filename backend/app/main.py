@@ -39,13 +39,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from .email_service import email_service
+
+async def _check_and_send_failure_emails(dags_list: list):
+    if not settings.ENABLE_EMAIL_ALERTS:
+        return
+    for dag in dags_list:
+        state = (dag.get("last_run_state") or "").lower()
+        if state in ("failed", "upstream_failed"):
+            dag_id = dag.get("dag_id")
+            dag_run_id = dag.get("last_run_id")
+            if not email_service.is_already_notified(dag_id, dag_run_id):
+                logs_text, error_detail = await airflow_client.fetch_dag_run_logs(dag_id, dag_run_id)
+                diagnosis = await ai_service.diagnose_failure_async(dag_id, dag_run_id, logs_text, error_detail)
+                await email_service.send_failure_alert_email_async(dag_id, dag_run_id, diagnosis)
+
 @app.get("/api/health", summary="Health Check")
 async def health_check():
     return {
         "status": "healthy",
         "service": "Airflow 3.2 Dashboard Caching Proxy",
         "airflow_base_url": settings.AIRFLOW_BASE_URL,
-        "cache_ttl_seconds": settings.CACHE_TTL_SECONDS
+        "cache_ttl_seconds": settings.CACHE_TTL_SECONDS,
+        "email_alerts_enabled": settings.ENABLE_EMAIL_ALERTS
     }
 
 @app.get("/api/dashboard-summary", response_model=DashboardSummaryResponse, summary="Get Dashboard Summary (15s Cached)")
@@ -59,6 +75,11 @@ async def get_dashboard_summary():
         (data, is_mock), is_cached, cached_at, remaining_ttl = await dashboard_cache.get_or_fetch(
             airflow_client.fetch_dashboard_summary
         )
+
+        # Trigger background email alert check if alerts are enabled
+        if settings.ENABLE_EMAIL_ALERTS:
+            import asyncio
+            asyncio.create_task(_check_and_send_failure_emails(data.get("dags", [])))
 
         return DashboardSummaryResponse(
             metrics=data["metrics"],
