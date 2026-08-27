@@ -20,9 +20,12 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
   if (lower.includes('google')) return { module: 'google', frequency: 'Monthly' };
   if (lower.includes('oag')) return { module: 'oag', frequency: 'Monthly' };
 
-  // Fallback module name from DAG ID prefix
+  // Fallback module name from DAG ID prefix (e.g., "inventory", "stripe", "warehouse")
   const parts = lower.split('_');
-  const moduleName = parts[0] || 'general';
+  let moduleName = parts[0] || 'general';
+  if (moduleName.length <= 2 && parts.length > 1) {
+    moduleName = `${parts[0]}_${parts[1]}`;
+  }
 
   // Fallback frequency from schedule
   let frequency = 'Daily';
@@ -38,9 +41,8 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
 
 /**
  * Exports current DAG metrics table data into an Excel (.xlsx) workbook.
- * Matches exact layout from screenshot:
  * Columns: Module | Tasks | Frequency | Status | Last run date
- * Grouped and merged by Module name.
+ * Ensures Module column is NEVER empty for any row.
  */
 export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   if (!dags || dags.length === 0) return;
@@ -59,7 +61,7 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
     });
   });
 
-  // 2. Build grouped rows and cell merges
+  // 2. Build rows with Module populated on EVERY row
   const sheet1Data = [];
   const merges = [];
   let currentRowIndex = 1; // Row 0 is header row
@@ -67,7 +69,6 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   Object.keys(groupedModules).forEach(moduleName => {
     const items = groupedModules[moduleName];
     const groupSize = items.length;
-    const midIndex = Math.floor(groupSize / 2);
 
     if (groupSize > 1) {
       merges.push({
@@ -76,9 +77,9 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
       });
     }
 
-    items.forEach((item, index) => {
+    items.forEach((item) => {
       sheet1Data.push({
-        'Module': index === midIndex ? moduleName : '',
+        'Module': item.module,
         'Tasks': item.dag_id,
         'Frequency': item.frequency,
         'Status': item.is_paused ? 'Paused' : 'Active',
@@ -126,7 +127,7 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
 
   // Auto column widths
   ws1['!cols'] = [
-    { wch: 18 }, // Module
+    { wch: 22 }, // Module
     { wch: 38 }, // Tasks
     { wch: 14 }, // Frequency
     { wch: 12 }, // Status
