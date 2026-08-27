@@ -42,7 +42,6 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
 /**
  * Exports current DAG metrics table data into an Excel (.xlsx) workbook.
  * Columns: Module | Tasks | Frequency | Status | Last run date
- * Ensures Module column is NEVER empty for any row.
  */
 export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   if (!dags || dags.length === 0) return;
@@ -90,39 +89,12 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
     currentRowIndex += groupSize;
   });
 
-  // Sheet 2: Frequency Reference Breakdown
-  const weeklyDags = dags.filter(dag => getDagModuleAndFrequency(dag.dag_id, dag.schedule_interval).frequency === 'Weekly');
-  const monthlyDags = dags.filter(dag => getDagModuleAndFrequency(dag.dag_id, dag.schedule_interval).frequency === 'Monthly');
-  const otherDags = dags.filter(dag => {
-    const freq = getDagModuleAndFrequency(dag.dag_id, dag.schedule_interval).frequency;
-    return freq !== 'Weekly' && freq !== 'Monthly';
-  });
-
-  const sheet2Data = [
-    {
-      'Frequency Category': 'Weekly Tasks (booking, hotels.com, priceline)',
-      'Total Tasks': weeklyDags.length,
-      'Task List': weeklyDags.map(d => d.dag_id).join(', ') || 'None'
-    },
-    {
-      'Frequency Category': 'Monthly Tasks (tripadvisor, airbnb, google, oag)',
-      'Total Tasks': monthlyDags.length,
-      'Task List': monthlyDags.map(d => d.dag_id).join(', ') || 'None'
-    },
-    {
-      'Frequency Category': 'Daily / Other Schedule Tasks',
-      'Total Tasks': otherDags.length,
-      'Task List': otherDags.map(d => d.dag_id).join(', ') || 'None'
-    }
-  ];
-
   const workbook = XLSX.utils.book_new();
 
-  // Create Worksheets
+  // Create Worksheet
   const ws1 = XLSX.utils.json_to_sheet(sheet1Data);
-  const ws2 = XLSX.utils.json_to_sheet(sheet2Data);
 
-  // Apply cell merges to Sheet 1
+  // Apply cell merges
   ws1['!merges'] = merges;
 
   // Auto column widths
@@ -134,14 +106,7 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
     { wch: 28 }  // Last run date
   ];
 
-  ws2['!cols'] = [
-    { wch: 48 }, // Category
-    { wch: 14 }, // Total Tasks
-    { wch: 80 }  // Task List
-  ];
-
   XLSX.utils.book_append_sheet(workbook, ws1, 'DAG Metrics');
-  XLSX.utils.book_append_sheet(workbook, ws2, 'Frequency Reference');
 
   const today = new Date().toISOString().split('T')[0];
   XLSX.writeFile(workbook, `${filenamePrefix}_${today}.xlsx`);
