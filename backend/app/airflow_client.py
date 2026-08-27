@@ -140,6 +140,9 @@ class AirflowClient:
                     elif state == "queued":
                         metrics["queued_dags"] += 1
 
+                    sched_str = str(d.get("schedule_interval") or d.get("timetable_summary") or d.get("timetable_description") or "@daily")
+                    module_name, freq = self._get_dag_module_and_frequency(d_id, sched_str)
+
                     processed_dags.append({
                         "dag_id": d_id,
                         "is_paused": is_paused,
@@ -149,8 +152,10 @@ class AirflowClient:
                         "last_run_state": state,
                         "last_run_time": last_time,
                         "last_run_id": latest_run.get("dag_run_id"),
-                        "schedule_interval": str(d.get("schedule_interval") or d.get("timetable_summary") or d.get("timetable_description") or "@daily"),
-                        "next_dagrun": d.get("next_dagrun") or d.get("next_dagrun_logical_date")
+                        "schedule_interval": sched_str,
+                        "next_dagrun": d.get("next_dagrun") or d.get("next_dagrun_logical_date"),
+                        "module": module_name,
+                        "frequency": freq
                     })
 
                 payload = {
@@ -164,6 +169,38 @@ class AirflowClient:
             if settings.USE_MOCK_FALLBACK:
                 return self._generate_mock_dashboard_data(), True
             raise err
+
+    def _get_dag_module_and_frequency(self, dag_id: str, schedule_interval: str) -> Tuple[str, str]:
+        lower = (dag_id or "").lower()
+        
+        # 1. Weekly Modules matching rules
+        for mod in settings.WEEKLY_MODULES:
+            if mod in lower:
+                return mod, "Weekly"
+
+        # 2. Monthly Modules matching rules
+        for mod in settings.MONTHLY_MODULES:
+            if mod in lower:
+                return mod, "Monthly"
+
+        # Fallback module name from DAG ID prefix
+        parts = lower.split("_")
+        module_name = parts[0] if parts else "general"
+        if len(module_name) <= 2 and len(parts) > 1:
+            module_name = f"{parts[0]}_{parts[1]}"
+
+        # Fallback frequency from schedule
+        frequency = "Daily"
+        if schedule_interval:
+            sched = str(schedule_interval).lower()
+            if "weekly" in sched:
+                frequency = "Weekly"
+            elif "monthly" in sched:
+                frequency = "Monthly"
+            elif "hourly" in sched:
+                frequency = "Hourly"
+
+        return module_name, frequency
 
     async def toggle_dag_pause(self, dag_id: str, is_paused: bool) -> Dict[str, Any]:
         """Proxy PATCH call to Airflow REST API to pause/unpause a DAG."""
@@ -402,6 +439,11 @@ class AirflowClient:
             "success_dags": success,
             "queued_dags": queued
         }
+
+        for d in mock_dags:
+            mod, freq = self._get_dag_module_and_frequency(d["dag_id"], d.get("schedule_interval", "@daily"))
+            d["module"] = mod
+            d["frequency"] = freq
 
         return {"metrics": metrics, "dags": mock_dags}
 

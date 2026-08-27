@@ -12,6 +12,8 @@ class DagItem(BaseModel):
     last_run_id: Optional[str] = None
     schedule_interval: Optional[str] = "@daily"
     next_dagrun: Optional[str] = None
+    module: Optional[str] = "general"
+    frequency: Optional[str] = "Daily"
 
 class MetricsSummary(BaseModel):
     total_dags: int = 0

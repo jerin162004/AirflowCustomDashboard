@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { formatAbsoluteDate } from './formatters';
 
 /**
- * Extracts Module and Frequency for a DAG based on user rules:
+ * Extracts Module and Frequency for a DAG based on user rules (client-side fallback):
  * - Weekly: booking, hotels.com / hotel, priceline
  * - Monthly: tripadvisor, airbnb, google, oag
  */
@@ -20,7 +20,7 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
   if (lower.includes('google')) return { module: 'google', frequency: 'Monthly' };
   if (lower.includes('oag')) return { module: 'oag', frequency: 'Monthly' };
 
-  // Fallback module name from DAG ID prefix (e.g., "inventory", "stripe", "warehouse")
+  // Fallback module name from DAG ID prefix
   const parts = lower.split('_');
   let moduleName = parts[0] || 'general';
   if (moduleName.length <= 2 && parts.length > 1) {
@@ -42,14 +42,18 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
 /**
  * Exports current DAG metrics table data into an Excel (.xlsx) workbook.
  * Columns: Module | Tasks | Frequency | Status | Last run date
+ * Uses backend provided module & frequency properties.
  */
 export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   if (!dags || dags.length === 0) return;
 
-  // 1. Group DAGs by Module
+  // 1. Group DAGs by Module using backend API properties
   const groupedModules = {};
   dags.forEach(dag => {
-    const { module, frequency } = getDagModuleAndFrequency(dag.dag_id, dag.schedule_interval);
+    const fallback = getDagModuleAndFrequency(dag.dag_id, dag.schedule_interval);
+    const module = dag.module || fallback.module;
+    const frequency = dag.frequency || fallback.frequency;
+
     if (!groupedModules[module]) {
       groupedModules[module] = [];
     }

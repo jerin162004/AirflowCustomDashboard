@@ -23,6 +23,14 @@ class Settings:
         e.strip() for e in os.getenv("ALERT_RECIPIENT_EMAILS", "").split(",") if e.strip()
     ]
 
+    # Frequency Module Categorization Rules
+    WEEKLY_MODULES: list = [
+        m.strip().lower() for m in os.getenv("WEEKLY_MODULES", "booking,hotels.com,hotel,hotels,priceline").split(",") if m.strip()
+    ]
+    MONTHLY_MODULES: list = [
+        m.strip().lower() for m in os.getenv("MONTHLY_MODULES", "tripadvisor,google,oag,airbnb").split(",") if m.strip()
+    ]
+
     # Frontend CORS origins
     CORS_ORIGINS: list = [
         "http://localhost:5173",
