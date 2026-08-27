@@ -25,11 +25,72 @@ class Settings:
 
     # Frequency Module Categorization Rules
     WEEKLY_MODULES: list = [
-        m.strip().lower() for m in os.getenv("WEEKLY_MODULES", "booking,hotels.com,hotel,hotels,priceline").split(",") if m.strip()
+        m.strip().lower() for m in os.getenv("WEEKLY_MODULES", "booking,hotelscom,priceline").split(",") if m.strip()
     ]
     MONTHLY_MODULES: list = [
         m.strip().lower() for m in os.getenv("MONTHLY_MODULES", "tripadvisor,google,oag,airbnb").split(",") if m.strip()
     ]
+
+    # Authoritative Module to DAG ID Dictionary Mapping
+    MODULE_DAG_ID: dict = {
+        'tripadvisor': [
+            'tripadvisor_archieve_load',
+            'tripadvisor_transform_data',
+            'tripadvisor_reviews_extractor',
+            'tripadvisor_run_actor_reviews',
+            'tripadvisor_listings_extractor',
+            'tripadvisor_run_actor_listings'
+        ],
+        'booking': [
+            'booking_hotels_rooms',
+            'booking_hotels_extractor',
+            'booking_hotels_license',
+            'booking_hotels_details',
+            'booking_hotels_search',
+            'booking_download_cities',
+            'booking_hotels_reviews',
+            'booking_archieve_load',
+            'booking_hotels_review_categories'
+        ],
+        'hotelscom': [
+            'hotelscom_hotels_extractor',
+            'hotelscom_hotels_reviews',
+            'hotelscom_hotels_rooms',
+            'hotelscom_hotels_details',
+            'hotelscom_hotels_search',
+            'hotelscom_download_regions',
+            'hotelscom_archieve_load'
+        ],
+        'priceline': [
+            'priceline_hotels_extractor',
+            'priceline_hotels_details',
+            'priceline_hotels_search',
+            'priceline_hotels_locations',
+            'priceline_hotels_reviews',
+            'priceline_download_cities',
+            'priceline_archieve_load'
+        ],
+        'google': [
+            'google_maps_run_actor',
+            'google_maps_stage_load',
+            'google_maps_extractor',
+            'google_maps_archieve_load'
+        ],
+        'oag': [
+            'oag_stage_load',
+            'oag_archieve_load'
+        ],
+        'airbnb': [
+            'airbnb_operational_extractor_weekly',
+            'airbnb_operational_extractor_monthly',
+            'airbnb_listings_reviews',
+            'airbnb_metabase_listings_extractor',
+            'airbnb_metabase_operational_extractor',
+            'airbnb_operational_extractor_daily',
+            'airbnb_weekly_archieve_load',
+            'airbnb_weekly_stage_load'
+        ]
+    }
 
     # Frontend CORS origins
     CORS_ORIGINS: list = [

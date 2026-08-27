@@ -173,34 +173,43 @@ class AirflowClient:
     def _get_dag_module_and_frequency(self, dag_id: str, schedule_interval: str) -> Tuple[str, str]:
         lower = (dag_id or "").lower()
         
-        # 1. Weekly Modules matching rules
-        for mod in settings.WEEKLY_MODULES:
-            if mod in lower:
-                return mod, "Weekly"
+        # 1. Exact reverse lookup in settings.MODULE_DAG_ID
+        found_module = None
+        for mod, dag_list in settings.MODULE_DAG_ID.items():
+            if lower in [d.lower() for d in dag_list]:
+                found_module = mod
+                break
+        
+        # 2. Prefix / substring match in MODULE_DAG_ID if exact match not found
+        if not found_module:
+            for mod in settings.MODULE_DAG_ID.keys():
+                if mod in lower:
+                    found_module = mod
+                    break
 
-        # 2. Monthly Modules matching rules
-        for mod in settings.MONTHLY_MODULES:
-            if mod in lower:
-                return mod, "Monthly"
+        if not found_module:
+            parts = lower.split("_")
+            found_module = parts[0] if parts else "general"
+            if len(found_module) <= 2 and len(parts) > 1:
+                found_module = f"{parts[0]}_{parts[1]}"
 
-        # Fallback module name from DAG ID prefix
-        parts = lower.split("_")
-        module_name = parts[0] if parts else "general"
-        if len(module_name) <= 2 and len(parts) > 1:
-            module_name = f"{parts[0]}_{parts[1]}"
+        # Determine Frequency: Weekly vs Monthly
+        if found_module in settings.WEEKLY_MODULES or any(w in lower for w in ["booking", "hotelscom", "hotel", "priceline"]):
+            frequency = "Weekly"
+        elif found_module in settings.MONTHLY_MODULES or any(m in lower for m in ["tripadvisor", "google", "oag", "airbnb"]):
+            frequency = "Monthly"
+        else:
+            frequency = "Daily"
+            if schedule_interval:
+                sched = str(schedule_interval).lower()
+                if "weekly" in sched:
+                    frequency = "Weekly"
+                elif "monthly" in sched:
+                    frequency = "Monthly"
+                elif "hourly" in sched:
+                    frequency = "Hourly"
 
-        # Fallback frequency from schedule
-        frequency = "Daily"
-        if schedule_interval:
-            sched = str(schedule_interval).lower()
-            if "weekly" in sched:
-                frequency = "Weekly"
-            elif "monthly" in sched:
-                frequency = "Monthly"
-            elif "hourly" in sched:
-                frequency = "Hourly"
-
-        return module_name, frequency
+        return found_module, frequency
 
     async def toggle_dag_pause(self, dag_id: str, is_paused: bool) -> Dict[str, Any]:
         """Proxy PATCH call to Airflow REST API to pause/unpause a DAG."""
