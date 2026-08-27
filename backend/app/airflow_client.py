@@ -171,32 +171,40 @@ class AirflowClient:
             raise err
 
     def _get_dag_module_and_frequency(self, dag_id: str, schedule_interval: str) -> Tuple[str, str]:
-        lower = (dag_id or "").lower()
+        clean_id = (dag_id or "").strip()
+        lower = clean_id.lower()
         
-        # 1. Exact reverse lookup in settings.MODULE_DAG_ID
+        # 1. Strict exact dictionary lookup FIRST
         found_module = None
         for mod, dag_list in settings.MODULE_DAG_ID.items():
-            if lower in [d.lower() for d in dag_list]:
+            if any(d.lower() == lower for d in dag_list):
                 found_module = mod
                 break
         
-        # 2. Prefix / substring match in MODULE_DAG_ID if exact match not found
+        # 2. Strict prefix match if exact match not found
         if not found_module:
-            for mod in settings.MODULE_DAG_ID.keys():
-                if mod in lower:
-                    found_module = mod
-                    break
-
-        if not found_module:
-            parts = lower.split("_")
-            found_module = parts[0] if parts else "general"
-            if len(found_module) <= 2 and len(parts) > 1:
-                found_module = f"{parts[0]}_{parts[1]}"
+            if lower.startswith("priceline"):
+                found_module = "priceline"
+            elif lower.startswith("hotelscom"):
+                found_module = "hotelscom"
+            elif lower.startswith("booking"):
+                found_module = "booking"
+            elif lower.startswith("tripadvisor"):
+                found_module = "tripadvisor"
+            elif lower.startswith("google"):
+                found_module = "google"
+            elif lower.startswith("oag"):
+                found_module = "oag"
+            elif lower.startswith("airbnb"):
+                found_module = "airbnb"
+            else:
+                parts = lower.split("_")
+                found_module = parts[0] if parts else "general"
 
         # Determine Frequency: Weekly vs Monthly
-        if found_module in settings.WEEKLY_MODULES or any(w in lower for w in ["booking", "hotelscom", "hotel", "priceline"]):
+        if found_module in ["booking", "hotelscom", "priceline"]:
             frequency = "Weekly"
-        elif found_module in settings.MONTHLY_MODULES or any(m in lower for m in ["tripadvisor", "google", "oag", "airbnb"]):
+        elif found_module in ["tripadvisor", "google", "oag", "airbnb"]:
             frequency = "Monthly"
         else:
             frequency = "Daily"
