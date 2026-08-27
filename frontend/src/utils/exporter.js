@@ -37,24 +37,56 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
 }
 
 /**
- * Exports current DAG metrics table data into an Excel (.xlsx) workbook with 2 sheets:
- * Sheet 1: "DAG Metrics" (Module, Tasks, Frequency, Status, Last Run State, Last run date)
- * Sheet 2: "Frequency Reference" (Weekly vs Monthly schedule breakdown reference)
+ * Exports current DAG metrics table data into an Excel (.xlsx) workbook.
+ * Matches exact layout from screenshot:
+ * Columns: Module | Tasks | Frequency | Status | Last run date
+ * Grouped and merged by Module name.
  */
 export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   if (!dags || dags.length === 0) return;
 
-  // Sheet 1: Main DAG Metrics (matching user reference CSV format)
-  const sheet1Data = dags.map(dag => {
+  // 1. Group DAGs by Module
+  const groupedModules = {};
+  dags.forEach(dag => {
     const { module, frequency } = getDagModuleAndFrequency(dag.dag_id, dag.schedule_interval);
-    return {
-      'Module': module,
-      'Tasks': dag.dag_id,
-      'Frequency': frequency,
-      'Status': dag.is_paused ? 'Paused' : 'Active',
-      'Last Run State': dag.last_run_state || 'none',
-      'Last run date': formatAbsoluteDate(dag.last_run_time)
-    };
+    if (!groupedModules[module]) {
+      groupedModules[module] = [];
+    }
+    groupedModules[module].push({
+      ...dag,
+      module,
+      frequency
+    });
+  });
+
+  // 2. Build grouped rows and cell merges
+  const sheet1Data = [];
+  const merges = [];
+  let currentRowIndex = 1; // Row 0 is header row
+
+  Object.keys(groupedModules).forEach(moduleName => {
+    const items = groupedModules[moduleName];
+    const groupSize = items.length;
+    const midIndex = Math.floor(groupSize / 2);
+
+    if (groupSize > 1) {
+      merges.push({
+        s: { r: currentRowIndex, c: 0 },
+        e: { r: currentRowIndex + groupSize - 1, c: 0 }
+      });
+    }
+
+    items.forEach((item, index) => {
+      sheet1Data.push({
+        'Module': index === midIndex ? moduleName : '',
+        'Tasks': item.dag_id,
+        'Frequency': item.frequency,
+        'Status': item.is_paused ? 'Paused' : 'Active',
+        'Last run date': formatAbsoluteDate(item.last_run_time)
+      });
+    });
+
+    currentRowIndex += groupSize;
   });
 
   // Sheet 2: Frequency Reference Breakdown
@@ -89,13 +121,15 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   const ws1 = XLSX.utils.json_to_sheet(sheet1Data);
   const ws2 = XLSX.utils.json_to_sheet(sheet2Data);
 
+  // Apply cell merges to Sheet 1
+  ws1['!merges'] = merges;
+
   // Auto column widths
   ws1['!cols'] = [
     { wch: 18 }, // Module
     { wch: 38 }, // Tasks
     { wch: 14 }, // Frequency
     { wch: 12 }, // Status
-    { wch: 16 }, // Last Run State
     { wch: 28 }  // Last run date
   ];
 
