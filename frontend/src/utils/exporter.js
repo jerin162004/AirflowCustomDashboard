@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { formatAbsoluteDate } from './formatters';
 
 /**
@@ -114,17 +113,31 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
 }
 
 /**
- * Exports current DAG metrics table data into an Excel (.xlsx) workbook.
- * Columns: Module | Tasks | Frequency | Status | Last run date
- * Uses strict dictionary lookup so priceline DAGs are NEVER placed under hotelscom.
+ * Exports DAG metrics into an Executive Styled Excel Report (.xls / .xlsx).
+ * Features:
+ * - Executive Title Banner & Summary KPI Header Cards
+ * - Color-Coded Status (Active/Paused) & Frequency (Weekly/Monthly) Badges
+ * - Midnight Blue Headers & Alternating Zebra Striping
+ * - Freeze Panes & Merged Module Column Groups
  */
 export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   if (!dags || dags.length === 0) return;
 
-  // 1. Group DAGs by Module using strict dictionary mapping
+  // 1. Group DAGs by Module and calculate KPI totals
   const groupedModules = {};
+  let totalActive = 0;
+  let totalPaused = 0;
+  let totalWeekly = 0;
+  let totalMonthly = 0;
+
   dags.forEach(dag => {
     const { module, frequency } = getDagModuleAndFrequency(dag.dag_id, dag.schedule_interval);
+    
+    if (dag.is_paused) totalPaused++;
+    else totalActive++;
+
+    if (frequency === 'Weekly') totalWeekly++;
+    else if (frequency === 'Monthly') totalMonthly++;
 
     if (!groupedModules[module]) {
       groupedModules[module] = [];
@@ -136,10 +149,10 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
     });
   });
 
-  // 2. Build rows with Module populated on EVERY row
-  const sheet1Data = [];
-  const merges = [];
-  let currentRowIndex = 1; // Row 0 is header row
+  const nowStr = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
 
   // Order modules logically according to dictionary keys
   const orderedModuleKeys = [
@@ -147,49 +160,142 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
     ...Object.keys(groupedModules).filter(k => !(k in MODULE_DAG_ID))
   ];
 
-  orderedModuleKeys.forEach(moduleName => {
+  // 2. Build HTML Excel content with rich executive styling
+  let html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="utf-8" />
+      <!--[if gte mso 9]>
+      <xml>
+        <x:ExcelWorkbook>
+          <x:ExcelWorksheets>
+            <x:ExcelWorksheet>
+              <x:Name>Executive DAG Metrics</x:Name>
+              <x:WorksheetOptions>
+                <x:DisplayGridlines/>
+                <x:FreezePanes/>
+                <x:FrozenNoSplit/>
+                <x:SplitHorizontal>7</x:SplitHorizontal>
+                <x:TopRowBottomPane>7</x:TopRowBottomPane>
+                <x:ActivePane>2</x:ActivePane>
+              </x:WorksheetOptions>
+            </x:ExcelWorksheet>
+          </x:ExcelWorksheets>
+        </x:ExcelWorkbook>
+      </xml>
+      <![endif]-->
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #ffffff; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        .banner { background-color: #0f172a; color: #ffffff; font-size: 15pt; font-weight: bold; padding: 14px; text-align: center; letter-spacing: 1px; }
+        .kpi-title { background-color: #f1f5f9; color: #475569; font-size: 8.5pt; font-weight: bold; text-transform: uppercase; padding: 6px; border: 1px solid #cbd5e1; text-align: center; }
+        .kpi-val { background-color: #ffffff; color: #0f172a; font-size: 13pt; font-weight: bold; padding: 8px; border: 1px solid #cbd5e1; text-align: center; }
+        th { background-color: #1e293b; color: #ffffff; font-size: 10.5pt; font-weight: bold; padding: 10px; border: 1px solid #334155; text-align: left; }
+        td { font-size: 9.5pt; padding: 8px; border: 1px solid #e2e8f0; vertical-align: middle; }
+        .row-even { background-color: #ffffff; }
+        .row-odd { background-color: #f8fafc; }
+        .module-cell { background-color: #f1f5f9; color: #0f172a; font-weight: bold; text-align: center; border: 1px solid #cbd5e1; font-size: 10pt; }
+        .badge-active { background-color: #d1fae5; color: #065f46; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #a7f3d0; }
+        .badge-paused { background-color: #fef3c7; color: #92400e; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #fde68a; }
+        .badge-weekly { background-color: #e0f2fe; color: #0369a1; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #bae6fd; }
+        .badge-monthly { background-color: #f3e8ff; color: #6b21a8; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #e9d5ff; }
+        .task-cell { font-family: 'Consolas', 'Courier New', monospace; font-weight: bold; color: #1e293b; }
+        .date-cell { color: #64748b; font-size: 9pt; }
+      </style>
+    </head>
+    <body>
+      <table>
+        <!-- Executive Title Banner -->
+        <tr>
+          <td colspan="5" class="banner">
+            AIRFLOW 3.2 EXECUTIVE OBSERVABILITY REPORT
+          </td>
+        </tr>
+
+        <!-- Spacing Row -->
+        <tr><td colspan="5" style="border:none; height:6px;"></td></tr>
+
+        <!-- KPI Summary Cards Header -->
+        <tr>
+          <td class="kpi-title">TOTAL WORKFLOWS</td>
+          <td class="kpi-title">ACTIVE WORKFLOWS</td>
+          <td class="kpi-title">PAUSED WORKFLOWS</td>
+          <td class="kpi-title">SCHEDULE FREQUENCY</td>
+          <td class="kpi-title">EXPORT TIMESTAMP</td>
+        </tr>
+        <tr>
+          <td class="kpi-val">${dags.length}</td>
+          <td class="kpi-val" style="color:#059669;">${totalActive}</td>
+          <td class="kpi-val" style="color:#d97706;">${totalPaused}</td>
+          <td class="kpi-val" style="font-size:11pt;">${totalWeekly} Weekly / ${totalMonthly} Monthly</td>
+          <td class="kpi-val" style="font-size:10pt; color:#475569;">${nowStr}</td>
+        </tr>
+
+        <!-- Spacing Row -->
+        <tr><td colspan="5" style="border:none; height:10px;"></td></tr>
+
+        <!-- Main Data Table Header -->
+        <tr>
+          <th style="width:160px; text-align:center;">Module</th>
+          <th style="width:360px;">Tasks (DAG Identifier)</th>
+          <th style="width:140px; text-align:center;">Frequency</th>
+          <th style="width:120px; text-align:center;">Status</th>
+          <th style="width:240px;">Last Run Date</th>
+        </tr>
+  `;
+
+  let globalRowCounter = 0;
+
+  orderedModuleKeys.forEach((moduleName) => {
     const items = groupedModules[moduleName];
     const groupSize = items.length;
 
-    if (groupSize > 1) {
-      merges.push({
-        s: { r: currentRowIndex, c: 0 },
-        e: { r: currentRowIndex + groupSize - 1, c: 0 }
-      });
-    }
+    items.forEach((item, idx) => {
+      const isEven = globalRowCounter % 2 === 0;
+      const rowClass = isEven ? 'row-even' : 'row-odd';
+      globalRowCounter++;
 
-    items.forEach((item) => {
-      sheet1Data.push({
-        'Module': item.module,
-        'Tasks': item.dag_id,
-        'Frequency': item.frequency,
-        'Status': item.is_paused ? 'Paused' : 'Active',
-        'Last run date': formatAbsoluteDate(item.last_run_time)
-      });
+      const statusBadge = item.is_paused
+        ? '<span class="badge-paused">PAUSED</span>'
+        : '<span class="badge-active">ACTIVE</span>';
+
+      const freqBadge = item.frequency === 'Weekly'
+        ? '<span class="badge-weekly">Weekly</span>'
+        : (item.frequency === 'Monthly' ? '<span class="badge-monthly">Monthly</span>' : item.frequency);
+
+      const formattedDate = formatAbsoluteDate(item.last_run_time);
+
+      html += `<tr class="${rowClass}">`;
+
+      // Merged Module cell for the group
+      if (idx === 0) {
+        html += `<td rowspan="${groupSize}" class="module-cell">${moduleName}</td>`;
+      }
+
+      html += `
+        <td class="task-cell">${item.dag_id}</td>
+        <td style="text-align:center;">${freqBadge}</td>
+        <td style="text-align:center;">${statusBadge}</td>
+        <td class="date-cell">${formattedDate}</td>
+      </tr>`;
     });
-
-    currentRowIndex += groupSize;
   });
 
-  const workbook = XLSX.utils.book_new();
+  html += `
+      </table>
+    </body>
+    </html>
+  `;
 
-  // Create Worksheet
-  const ws1 = XLSX.utils.json_to_sheet(sheet1Data);
-
-  // Apply cell merges
-  ws1['!merges'] = merges;
-
-  // Auto column widths
-  ws1['!cols'] = [
-    { wch: 22 }, // Module
-    { wch: 42 }, // Tasks
-    { wch: 14 }, // Frequency
-    { wch: 12 }, // Status
-    { wch: 28 }  // Last run date
-  ];
-
-  XLSX.utils.book_append_sheet(workbook, ws1, 'DAG Metrics');
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
 
   const today = new Date().toISOString().split('T')[0];
-  XLSX.writeFile(workbook, `${filenamePrefix}_${today}.xlsx`);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${filenamePrefix}_${today}.xls`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
