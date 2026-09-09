@@ -92,6 +92,13 @@ class Settings:
         ]
     }
 
+    # Specific DAG Frequency Overrides
+    SPECIFIC_DAG_FREQUENCY_OVERRIDES: dict = {
+        'priceline_hotels_reviews': 'Monthly',
+        'airbnb_listings_reviews': 'Weekly',
+        'airbnb_operational_extractor_weekly': 'Weekly'
+    }
+
     # Frontend CORS origins
     CORS_ORIGINS: list = [
         "http://localhost:5173",

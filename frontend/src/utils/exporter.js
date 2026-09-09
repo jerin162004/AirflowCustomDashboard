@@ -64,7 +64,16 @@ export const MODULE_DAG_ID = {
 };
 
 /**
- * Strictly maps a DAG ID to its module and frequency using exact dictionary lookup
+ * Specific DAG frequency overrides provided by user
+ */
+export const SPECIFIC_DAG_FREQUENCY_OVERRIDES = {
+  'priceline_hotels_reviews': 'Monthly',
+  'airbnb_listings_reviews': 'Weekly',
+  'airbnb_operational_extractor_weekly': 'Weekly'
+};
+
+/**
+ * Strictly maps a DAG ID to its module and frequency using exact dictionary lookup & overrides
  */
 export function getDagModuleAndFrequency(dagId, scheduleInterval) {
   const cleanId = (dagId || '').trim();
@@ -94,19 +103,22 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
     }
   }
 
-  // Frequency mapping:
-  // Weekly: booking, hotelscom, priceline
-  // Monthly: tripadvisor, google, oag, airbnb
-  let frequency = 'Daily';
-  if (['booking', 'hotelscom', 'priceline'].includes(moduleName)) {
-    frequency = 'Weekly';
-  } else if (['tripadvisor', 'google', 'oag', 'airbnb'].includes(moduleName)) {
-    frequency = 'Monthly';
-  } else if (scheduleInterval) {
-    const sched = String(scheduleInterval).toLowerCase();
-    if (sched.includes('weekly') || sched.includes('@weekly')) frequency = 'Weekly';
-    else if (sched.includes('monthly') || sched.includes('@monthly')) frequency = 'Monthly';
-    else if (sched.includes('hourly') || sched.includes('@hourly')) frequency = 'Hourly';
+  // 3. Frequency mapping with specific DAG overrides FIRST
+  let frequency = SPECIFIC_DAG_FREQUENCY_OVERRIDES[lower];
+  if (!frequency) {
+    if (['booking', 'hotelscom', 'priceline'].includes(moduleName)) {
+      frequency = 'Weekly';
+    } else if (['tripadvisor', 'google', 'oag', 'airbnb'].includes(moduleName)) {
+      frequency = 'Monthly';
+    } else if (scheduleInterval) {
+      const sched = String(scheduleInterval).toLowerCase();
+      if (sched.includes('weekly') || sched.includes('@weekly')) frequency = 'Weekly';
+      else if (sched.includes('monthly') || sched.includes('@monthly')) frequency = 'Monthly';
+      else if (sched.includes('hourly') || sched.includes('@hourly')) frequency = 'Hourly';
+      else frequency = 'Daily';
+    } else {
+      frequency = 'Daily';
+    }
   }
 
   return { module: moduleName, frequency };
@@ -114,11 +126,6 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
 
 /**
  * Exports DAG metrics into an Executive Styled Excel Report (.xls / .xlsx).
- * Features:
- * - Executive Title Banner & Summary KPI Header Cards
- * - Color-Coded Status (Active/Paused) & Frequency (Weekly/Monthly) Badges
- * - Midnight Blue Headers & Alternating Zebra Striping
- * - Freeze Panes & Merged Module Column Groups
  */
 export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   if (!dags || dags.length === 0) return;

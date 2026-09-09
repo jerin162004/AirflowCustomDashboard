@@ -201,8 +201,10 @@ class AirflowClient:
                 parts = lower.split("_")
                 found_module = parts[0] if parts else "general"
 
-        # Determine Frequency: Weekly vs Monthly
-        if found_module in ["booking", "hotelscom", "priceline"]:
+        # Determine Frequency: Specific Overrides FIRST
+        if lower in settings.SPECIFIC_DAG_FREQUENCY_OVERRIDES:
+            frequency = settings.SPECIFIC_DAG_FREQUENCY_OVERRIDES[lower]
+        elif found_module in ["booking", "hotelscom", "priceline"]:
             frequency = "Weekly"
         elif found_module in ["tripadvisor", "google", "oag", "airbnb"]:
             frequency = "Monthly"
