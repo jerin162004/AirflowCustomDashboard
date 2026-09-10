@@ -13,22 +13,29 @@ export default function DagDependencyModal({ dagId, onClose, onTriggerDag, onDia
     setLoading(true);
     setError(null);
 
-    fetch(`http://localhost:8000/api/dags/${encodeURIComponent(dagId)}/dependencies`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
+    const fetchDependencies = async () => {
+      try {
+        let res = await fetch(`/api/dags/${encodeURIComponent(dagId)}/dependencies`);
+        if (!res.ok) {
+          // Fallback to direct backend URL if proxy is bypassed
+          res = await fetch(`http://localhost:8000/api/dags/${encodeURIComponent(dagId)}/dependencies`);
+        }
+        if (!res.ok) {
+          throw new Error(`Proxy backend error ${res.status}`);
+        }
+        const data = await res.json();
         setGraphData(data);
         const target = data.nodes?.find((n) => n.type === 'target') || data.nodes?.[0];
         setSelectedNode(target);
         setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Failed to load DAG dependencies:', err);
         setError('Failed to load dependency graph. Please check backend proxy connection.');
         setLoading(false);
-      });
+      }
+    };
+
+    fetchDependencies();
   }, [dagId]);
 
   if (!dagId) return null;
