@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Pause, Power, Clock, Tag, User, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Copy, Check, Square, Sparkles } from 'lucide-react';
+import { Play, Pause, Power, Clock, Tag, User, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Copy, Check, Square, Sparkles, Network } from 'lucide-react';
 import { formatRelativeTime, formatAbsoluteDate, getStateBadgeConfig } from '../utils/formatters';
 
 export function DagTable({ 
@@ -9,6 +9,7 @@ export function DagTable({
   onOpenTriggerModal,
   onStopDag,
   onDiagnose,
+  onOpenGraphModal,
   sortBy,
   setSortBy,
   onToast
@@ -239,11 +240,21 @@ export function DagTable({
                     {formatAbsoluteDate(dag.last_run_time)}
                   </td>
 
-                  {/* Action Button: Dynamic Stop DAG (when running) vs Trigger DAG (when idle) */}
+                  {/* Action Buttons: View Graph + Dynamic Stop DAG (when running) vs Trigger DAG (when idle) */}
                   <td className="py-4 px-6 text-right">
-                    <div className="flex items-center justify-end">
+                    <div className="flex items-center justify-end space-x-2">
+                      {/* View Dependency Graph Button */}
+                      <button
+                        onClick={() => onOpenGraphModal && onOpenGraphModal(dag.dag_id)}
+                        className="inline-flex items-center justify-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 active:scale-95 transition-all duration-150 whitespace-nowrap"
+                        title="View Upstream / Downstream DAG Dependency Graph"
+                      >
+                        <Network className="w-3.5 h-3.5" />
+                        <span>View Graph 🕸️</span>
+                      </button>
+
                       {((dag.last_run_state || '').toLowerCase() === 'running' || (dag.last_run_state || '').toLowerCase() === 'queued') ? (
-                        /* Stop / Cancel DAG Run Button (Visible only when DAG is running or queued) */
+                        /* Stop / Cancel DAG Run Button */
                         <button
                           onClick={() => handleStop(dag.dag_id, dag.last_run_id)}
                           disabled={stoppingDagId === dag.dag_id}
@@ -258,7 +269,7 @@ export function DagTable({
                           <span>Stop DAG</span>
                         </button>
                       ) : (
-                        /* Trigger DAG Execution Button (Visible when DAG is not running) */
+                        /* Trigger DAG Execution Button */
                         <button
                           onClick={() => onOpenTriggerModal(dag.dag_id)}
                           className="inline-flex items-center justify-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 active:scale-95 shadow-sm shadow-cyan-500/20 transition-all duration-150 whitespace-nowrap"

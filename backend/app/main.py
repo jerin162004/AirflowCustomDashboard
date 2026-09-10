@@ -151,6 +151,15 @@ async def stop_dag(
     else:
         raise HTTPException(status_code=400, detail=res.get("message", "Failed to stop DAG run"))
 
+@app.get("/api/dags/{dag_id}/dependencies", summary="Fetch Upstream / Downstream DAG Dependency Graph")
+async def get_dag_dependencies(
+    dag_id: str = Path(..., description="The DAG identifier")
+):
+    """
+    Returns upstream and downstream DAG dependencies, graph nodes, and edges for interactive visualization.
+    """
+    return await airflow_client.fetch_dag_dependencies(dag_id)
+
 @app.post("/api/dags/{dag_id}/diagnose", summary="Automated AI Error & Log Diagnosis")
 async def diagnose_failure(
     dag_id: str = Path(..., description="The DAG identifier"),

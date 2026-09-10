@@ -10,6 +10,7 @@ import { TriggerModal } from './components/TriggerModal';
 import { ToastNotification } from './components/ToastNotification';
 import { AiDiagnosisModal } from './components/AiDiagnosisModal';
 import { ChatOpsBar } from './components/ChatOpsBar';
+import DagDependencyModal from './components/DagDependencyModal';
 import { exportToExcel } from './utils/exporter';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -38,6 +39,7 @@ export default function App() {
 
   // Modal & Assistant states
   const [activeTriggerDagId, setActiveTriggerDagId] = useState(null);
+  const [graphDagId, setGraphDagId] = useState(null);
   const [isChatOpsOpen, setIsChatOpsOpen] = useState(false);
   const [diagnosisState, setDiagnosisState] = useState({ isOpen: false, loading: false, data: null });
   const [toast, setToast] = useState(null);
@@ -251,6 +253,7 @@ export default function App() {
           onOpenTriggerModal={(dagId) => setActiveTriggerDagId(dagId)}
           onStopDag={handleStopDag}
           onDiagnose={handleOpenDiagnosis}
+          onOpenGraphModal={(dagId) => setGraphDagId(dagId)}
           sortBy={sortBy}
           setSortBy={setSortBy}
           onToast={showToast}
@@ -265,6 +268,16 @@ export default function App() {
         dagId={activeTriggerDagId}
         onTrigger={handleTriggerDag}
       />
+
+      {/* Interactive Upstream/Downstream DAG Dependency Graph Modal */}
+      {graphDagId && (
+        <DagDependencyModal
+          dagId={graphDagId}
+          onClose={() => setGraphDagId(null)}
+          onTriggerDag={(dagId) => setActiveTriggerDagId(dagId)}
+          onDiagnoseDag={(dagId) => handleOpenDiagnosis(dagId)}
+        />
+      )}
 
       {/* AI Automated Error Diagnosis Modal */}
       <AiDiagnosisModal
