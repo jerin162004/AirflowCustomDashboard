@@ -111,3 +111,57 @@ class Settings:
     ]
 
 settings = Settings()
+
+def get_api_details_for_dag(dag_id: str, module_name: str) -> dict:
+    clean_id = (dag_id or "").strip().lower()
+    clean_mod = (module_name or "").strip().lower()
+
+    # Rule 1: Rapid API (booking, priceline, hotelscom, and airbnb_listings_reviews)
+    if clean_mod in ["booking", "priceline", "hotelscom"] or clean_id == "airbnb_listings_reviews":
+        provider = "Rapid API"
+        if "booking" in clean_mod or "booking" in clean_id:
+            api_name = "RapidAPI Booking Engine API"
+            cost = "$0.005"
+        elif "priceline" in clean_mod or "priceline" in clean_id:
+            api_name = "RapidAPI Priceline API"
+            cost = "$0.006"
+        elif "hotelscom" in clean_mod or "hotelscom" in clean_id:
+            api_name = "RapidAPI Hotels.com API"
+            cost = "$0.004"
+        else:
+            api_name = "RapidAPI Airbnb Reviews API"
+            cost = "$0.007"
+        return {"api_provider_name": provider, "api_name": api_name, "api_call_cost": cost}
+
+    # Rule 2: Apify (google and tripadvisor modules)
+    if clean_mod in ["google", "tripadvisor"] or "google" in clean_id or "tripadvisor" in clean_id:
+        provider = "Apify"
+        if "google" in clean_mod or "google" in clean_id:
+            api_name = "Apify Google Maps Scraper API"
+            cost = "$0.017"
+        else:
+            api_name = "Apify TripAdvisor Actor API"
+            cost = "$0.008"
+        return {"api_provider_name": provider, "api_name": api_name, "api_call_cost": cost}
+
+    # Rule 3: Snowflake (oag module)
+    if clean_mod == "oag" or "oag" in clean_id:
+        return {
+            "api_provider_name": "Snowflake",
+            "api_name": "Snowflake OAG Flight Data Share",
+            "api_call_cost": "$0.012"
+        }
+
+    # Rule 4: Lighthouse (other airbnb DAGs)
+    if clean_mod == "airbnb" or "airbnb" in clean_id:
+        return {
+            "api_provider_name": "Lighthouse",
+            "api_name": "Lighthouse Hospitality Intelligence API",
+            "api_call_cost": "$0.007"
+        }
+
+    return {
+        "api_provider_name": "Internal Pipeline",
+        "api_name": "Core Data Ingestion API",
+        "api_call_cost": "$0.001"
+    }

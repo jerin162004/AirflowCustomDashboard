@@ -14,6 +14,9 @@ class DagItem(BaseModel):
     next_dagrun: Optional[str] = None
     module: Optional[str] = "general"
     frequency: Optional[str] = "Daily"
+    api_provider_name: Optional[str] = "Internal Pipeline"
+    api_name: Optional[str] = "Core Data Ingestion API"
+    api_call_cost: Optional[str] = "$0.001"
 
 class MetricsSummary(BaseModel):
     total_dags: int = 0

@@ -2,7 +2,7 @@ import httpx
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Tuple, List
-from .config import settings
+from .config import settings, get_api_details_for_dag
 from .schemas import DagItem, MetricsSummary
 
 logger = logging.getLogger("airflow_client")
@@ -142,6 +142,7 @@ class AirflowClient:
 
                     sched_str = str(d.get("schedule_interval") or d.get("timetable_summary") or d.get("timetable_description") or "@daily")
                     module_name, freq = self._get_dag_module_and_frequency(d_id, sched_str)
+                    api_info = get_api_details_for_dag(d_id, module_name)
 
                     processed_dags.append({
                         "dag_id": d_id,
@@ -155,7 +156,10 @@ class AirflowClient:
                         "schedule_interval": sched_str,
                         "next_dagrun": d.get("next_dagrun") or d.get("next_dagrun_logical_date"),
                         "module": module_name,
-                        "frequency": freq
+                        "frequency": freq,
+                        "api_provider_name": api_info["api_provider_name"],
+                        "api_name": api_info["api_name"],
+                        "api_call_cost": api_info["api_call_cost"]
                     })
 
                 payload = {
@@ -570,6 +574,10 @@ class AirflowClient:
             mod, freq = self._get_dag_module_and_frequency(d["dag_id"], d.get("schedule_interval", "@daily"))
             d["module"] = mod
             d["frequency"] = freq
+            api_info = get_api_details_for_dag(d["dag_id"], mod)
+            d["api_provider_name"] = api_info["api_provider_name"]
+            d["api_name"] = api_info["api_name"]
+            d["api_call_cost"] = api_info["api_call_cost"]
 
         return {"metrics": metrics, "dags": mock_dags}
 

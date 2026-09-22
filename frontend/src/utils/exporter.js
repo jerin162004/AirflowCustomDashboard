@@ -79,50 +79,63 @@ export const SPECIFIC_DAG_FREQUENCY_OVERRIDES = {
 /**
  * Helper to retrieve API Details for each DAG/Module
  */
-export function getApiDetailsForDag(dagId, moduleName) {
+export function getApiDetailsForDag(dagId, moduleName, dagObj = null) {
+  if (dagObj && dagObj.api_provider_name && dagObj.api_name && dagObj.api_call_cost) {
+    return {
+      provider: dagObj.api_provider_name,
+      apiName: dagObj.api_name,
+      cost: dagObj.api_call_cost
+    };
+  }
+
   const lowerMod = (moduleName || '').toLowerCase();
   const lowerDag = (dagId || '').toLowerCase();
 
-  if (lowerMod === 'booking' || lowerDag.includes('booking')) {
+  // Rule 1: Rapid API (booking, priceline, hotelscom, and airbnb_listings_reviews)
+  if (['booking', 'priceline', 'hotelscom'].includes(lowerMod) || lowerDag === 'airbnb_listings_reviews') {
+    let provider = 'Rapid API';
+    let apiName = 'RapidAPI Travel Engine API';
+    let cost = '$0.005';
+    if (lowerMod === 'booking' || lowerDag.includes('booking')) {
+      apiName = 'RapidAPI Booking Engine API';
+      cost = '$0.005';
+    } else if (lowerMod === 'priceline' || lowerDag.includes('priceline')) {
+      apiName = 'RapidAPI Priceline API';
+      cost = '$0.006';
+    } else if (lowerMod === 'hotelscom' || lowerDag.includes('hotelscom')) {
+      apiName = 'RapidAPI Hotels.com API';
+      cost = '$0.004';
+    } else if (lowerDag === 'airbnb_listings_reviews') {
+      apiName = 'RapidAPI Airbnb Reviews API';
+      cost = '$0.007';
+    }
+    return { provider, apiName, cost };
+  }
+
+  // Rule 2: Apify (google and tripadvisor modules)
+  if (['google', 'tripadvisor'].includes(lowerMod) || lowerDag.includes('google') || lowerDag.includes('tripadvisor')) {
+    let provider = 'Apify';
+    let apiName = lowerMod === 'google' || lowerDag.includes('google')
+      ? 'Apify Google Maps Scraper API'
+      : 'Apify TripAdvisor Actor API';
+    let cost = lowerMod === 'google' || lowerDag.includes('google') ? '$0.017' : '$0.008';
+    return { provider, apiName, cost };
+  }
+
+  // Rule 3: Snowflake (oag module)
+  if (lowerMod === 'oag' || lowerDag.includes('oag')) {
     return {
-      provider: 'Booking.com',
-      apiName: 'Booking Hotels & Cities API',
-      cost: '$0.005'
-    };
-  } else if (lowerMod === 'hotelscom' || lowerDag.includes('hotelscom')) {
-    return {
-      provider: 'Hotels.com',
-      apiName: 'Hotels Search & Region API',
-      cost: '$0.004'
-    };
-  } else if (lowerMod === 'priceline' || lowerDag.includes('priceline')) {
-    return {
-      provider: 'Priceline',
-      apiName: 'Priceline Hotels & Locations API',
-      cost: '$0.006'
-    };
-  } else if (lowerMod === 'tripadvisor' || lowerDag.includes('tripadvisor')) {
-    return {
-      provider: 'TripAdvisor',
-      apiName: 'TripAdvisor Content & Reviews API',
-      cost: '$0.008'
-    };
-  } else if (lowerMod === 'google' || lowerDag.includes('google')) {
-    return {
-      provider: 'Google Maps Platform',
-      apiName: 'Google Places & Geocoding API',
-      cost: '$0.017'
-    };
-  } else if (lowerMod === 'oag' || lowerDag.includes('oag')) {
-    return {
-      provider: 'OAG Aviation',
-      apiName: 'OAG Flight Schedules API',
+      provider: 'Snowflake',
+      apiName: 'Snowflake OAG Flight Data Share',
       cost: '$0.012'
     };
-  } else if (lowerMod === 'airbnb' || lowerDag.includes('airbnb')) {
+  }
+
+  // Rule 4: Lighthouse (other airbnb DAGs)
+  if (lowerMod === 'airbnb' || lowerDag.includes('airbnb')) {
     return {
-      provider: 'Airbnb Data Engine',
-      apiName: 'Airbnb Listings & Operational API',
+      provider: 'Lighthouse',
+      apiName: 'Lighthouse Hospitality Intelligence API',
       cost: '$0.007'
     };
   }
@@ -383,7 +396,7 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
         : (item.frequency === 'Monthly' ? '<span class="badge-monthly">Monthly</span>' : item.frequency);
 
       const formattedDate = formatAbsoluteDate(item.last_run_time);
-      const apiInfo = getApiDetailsForDag(item.dag_id, item.module);
+      const apiInfo = getApiDetailsForDag(item.dag_id, item.module, item);
 
       html += `<tr class="${rowClass}">`;
 
