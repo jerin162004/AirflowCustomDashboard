@@ -77,6 +77,64 @@ export const SPECIFIC_DAG_FREQUENCY_OVERRIDES = {
 };
 
 /**
+ * Helper to retrieve API Details for each DAG/Module
+ */
+export function getApiDetailsForDag(dagId, moduleName) {
+  const lowerMod = (moduleName || '').toLowerCase();
+  const lowerDag = (dagId || '').toLowerCase();
+
+  if (lowerMod === 'booking' || lowerDag.includes('booking')) {
+    return {
+      provider: 'Booking.com',
+      apiName: 'Booking Hotels & Cities API',
+      cost: '$0.005'
+    };
+  } else if (lowerMod === 'hotelscom' || lowerDag.includes('hotelscom')) {
+    return {
+      provider: 'Hotels.com',
+      apiName: 'Hotels Search & Region API',
+      cost: '$0.004'
+    };
+  } else if (lowerMod === 'priceline' || lowerDag.includes('priceline')) {
+    return {
+      provider: 'Priceline',
+      apiName: 'Priceline Hotels & Locations API',
+      cost: '$0.006'
+    };
+  } else if (lowerMod === 'tripadvisor' || lowerDag.includes('tripadvisor')) {
+    return {
+      provider: 'TripAdvisor',
+      apiName: 'TripAdvisor Content & Reviews API',
+      cost: '$0.008'
+    };
+  } else if (lowerMod === 'google' || lowerDag.includes('google')) {
+    return {
+      provider: 'Google Maps Platform',
+      apiName: 'Google Places & Geocoding API',
+      cost: '$0.017'
+    };
+  } else if (lowerMod === 'oag' || lowerDag.includes('oag')) {
+    return {
+      provider: 'OAG Aviation',
+      apiName: 'OAG Flight Schedules API',
+      cost: '$0.012'
+    };
+  } else if (lowerMod === 'airbnb' || lowerDag.includes('airbnb')) {
+    return {
+      provider: 'Airbnb Data Engine',
+      apiName: 'Airbnb Listings & Operational API',
+      cost: '$0.007'
+    };
+  }
+
+  return {
+    provider: 'Internal Pipeline',
+    apiName: 'Core Data Ingestion API',
+    cost: '$0.001'
+  };
+}
+
+/**
  * Strictly maps a DAG ID to its module and frequency using exact dictionary lookup & overrides
  */
 export function getDagModuleAndFrequency(dagId, scheduleInterval) {
@@ -130,7 +188,7 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
 
 /**
  * Exports DAG metrics into an Executive Styled Excel Report (.xls / .xlsx).
- * Uses real live DAG run state (SUCCESS vs FAILED) without artificial hardcoding.
+ * Includes 3 new columns after Tasks: Api provider name, Api name, Api call cost.
  */
 export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   const inputDags = Array.isArray(dags) ? dags : [];
@@ -254,40 +312,43 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
       <table>
         <!-- Executive Title Banner -->
         <tr>
-          <td colspan="5" class="banner">
+          <td colspan="8" class="banner">
             AIRFLOW 3.2 EXECUTIVE OBSERVABILITY REPORT
           </td>
         </tr>
 
         <!-- Spacing Row -->
-        <tr><td colspan="5" style="border:none; height:6px;"></td></tr>
+        <tr><td colspan="8" style="border:none; height:6px;"></td></tr>
 
         <!-- KPI Summary Cards Header -->
         <tr>
-          <td class="kpi-title">TOTAL WORKFLOWS</td>
+          <td colspan="2" class="kpi-title">TOTAL WORKFLOWS</td>
           <td class="kpi-title">ACTIVE WORKFLOWS</td>
           <td class="kpi-title">PAUSED WORKFLOWS</td>
-          <td class="kpi-title">SCHEDULE FREQUENCY</td>
-          <td class="kpi-title">EXPORT TIMESTAMP</td>
+          <td colspan="2" class="kpi-title">SCHEDULE FREQUENCY</td>
+          <td colspan="2" class="kpi-title">EXPORT TIMESTAMP</td>
         </tr>
         <tr>
-          <td class="kpi-val">${completeDagList.length}</td>
+          <td colspan="2" class="kpi-val">${completeDagList.length}</td>
           <td class="kpi-val" style="color:#059669;">${totalActive}</td>
           <td class="kpi-val" style="color:#d97706;">${totalPaused}</td>
-          <td class="kpi-val" style="font-size:11pt;">${totalWeekly} Weekly / ${totalMonthly} Monthly</td>
-          <td class="kpi-val" style="font-size:10pt; color:#475569;">${nowStr}</td>
+          <td colspan="2" class="kpi-val" style="font-size:11pt;">${totalWeekly} Weekly / ${totalMonthly} Monthly</td>
+          <td colspan="2" class="kpi-val" style="font-size:10pt; color:#475569;">${nowStr}</td>
         </tr>
 
         <!-- Spacing Row -->
-        <tr><td colspan="5" style="border:none; height:10px;"></td></tr>
+        <tr><td colspan="8" style="border:none; height:10px;"></td></tr>
 
         <!-- Main Data Table Header -->
         <tr>
-          <th style="width:160px; text-align:center;">Module</th>
-          <th style="width:360px;">Tasks (DAG Identifier)</th>
-          <th style="width:140px; text-align:center;">Frequency</th>
-          <th style="width:120px; text-align:center;">Status</th>
-          <th style="width:240px;">Last Run Date</th>
+          <th style="width:140px; text-align:center;">Module</th>
+          <th style="width:340px;">Tasks (DAG Identifier)</th>
+          <th style="width:180px;">Api provider name</th>
+          <th style="width:260px;">Api name</th>
+          <th style="width:120px; text-align:right;">Api call cost</th>
+          <th style="width:120px; text-align:center;">Frequency</th>
+          <th style="width:110px; text-align:center;">Status</th>
+          <th style="width:220px;">Last Run Date</th>
         </tr>
   `;
 
@@ -322,6 +383,7 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
         : (item.frequency === 'Monthly' ? '<span class="badge-monthly">Monthly</span>' : item.frequency);
 
       const formattedDate = formatAbsoluteDate(item.last_run_time);
+      const apiInfo = getApiDetailsForDag(item.dag_id, item.module);
 
       html += `<tr class="${rowClass}">`;
 
@@ -332,6 +394,9 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
 
       html += `
         <td class="task-cell">${item.dag_id}</td>
+        <td style="color:#1e293b; font-weight:600;">${apiInfo.provider}</td>
+        <td style="color:#475569;">${apiInfo.apiName}</td>
+        <td style="text-align:right; font-family:monospace; font-weight:bold; color:#059669;">${apiInfo.cost}</td>
         <td style="text-align:center;">${freqBadge}</td>
         <td style="text-align:center;">${statusBadge}</td>
         <td class="date-cell">${formattedDate}</td>
