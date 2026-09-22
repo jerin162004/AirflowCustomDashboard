@@ -96,7 +96,11 @@ class Settings:
     SPECIFIC_DAG_FREQUENCY_OVERRIDES: dict = {
         'priceline_hotels_reviews': 'Monthly',
         'airbnb_listings_reviews': 'Weekly',
-        'airbnb_operational_extractor_weekly': 'Weekly'
+        'airbnb_operational_extractor_weekly': 'Weekly',
+        'airbnb_weekly_stage_load': 'Weekly',
+        'tripadvisor_run_actor_listings': 'Monthly',
+        'tripadvisor_run_actor_reviews': 'Monthly',
+        'google_maps_run_actor': 'Monthly'
     }
 
     # Frontend CORS origins

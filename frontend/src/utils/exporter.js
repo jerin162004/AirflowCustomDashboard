@@ -69,7 +69,11 @@ export const MODULE_DAG_ID = {
 export const SPECIFIC_DAG_FREQUENCY_OVERRIDES = {
   'priceline_hotels_reviews': 'Monthly',
   'airbnb_listings_reviews': 'Weekly',
-  'airbnb_operational_extractor_weekly': 'Weekly'
+  'airbnb_operational_extractor_weekly': 'Weekly',
+  'airbnb_weekly_stage_load': 'Weekly',
+  'tripadvisor_run_actor_listings': 'Monthly',
+  'tripadvisor_run_actor_reviews': 'Monthly',
+  'google_maps_run_actor': 'Monthly'
 };
 
 /**
@@ -126,6 +130,7 @@ export function getDagModuleAndFrequency(dagId, scheduleInterval) {
 
 /**
  * Exports DAG metrics into an Executive Styled Excel Report (.xls / .xlsx).
+ * Denotes DAG Run Status as SUCCESS vs FAILED.
  */
 export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
   if (!dags || dags.length === 0) return;
@@ -203,7 +208,9 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
         .row-odd { background-color: #f8fafc; }
         .module-cell { background-color: #f1f5f9; color: #0f172a; font-weight: bold; text-align: center; border: 1px solid #cbd5e1; font-size: 10pt; }
         .badge-active { background-color: #d1fae5; color: #065f46; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #a7f3d0; }
-        .badge-paused { background-color: #fef3c7; color: #92400e; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #fde68a; }
+        .badge-failed { background-color: #ffe4e6; color: #9f1239; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #fecdd3; }
+        .badge-running { background-color: #cffafe; color: #155e75; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #a5f3fc; }
+        .badge-queued { background-color: #fef3c7; color: #92400e; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #fde68a; }
         .badge-weekly { background-color: #e0f2fe; color: #0369a1; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #bae6fd; }
         .badge-monthly { background-color: #f3e8ff; color: #6b21a8; font-weight: bold; text-align: center; padding: 4px 10px; border: 1px solid #e9d5ff; }
         .task-cell { font-family: 'Consolas', 'Courier New', monospace; font-weight: bold; color: #1e293b; }
@@ -262,9 +269,20 @@ export function exportToExcel(dags, filenamePrefix = 'Airflow_DAG_Metrics') {
       const rowClass = isEven ? 'row-even' : 'row-odd';
       globalRowCounter++;
 
-      const statusBadge = item.is_paused
-        ? '<span class="badge-paused">PAUSED</span>'
-        : '<span class="badge-active">ACTIVE</span>';
+      const runState = (item.last_run_state || '').toLowerCase();
+      let statusBadge = '<span class="badge-active">SUCCESS</span>';
+      
+      if (runState === 'failed' || runState === 'upstream_failed') {
+        statusBadge = '<span class="badge-failed">FAILED</span>';
+      } else if (runState === 'running') {
+        statusBadge = '<span class="badge-running">RUNNING</span>';
+      } else if (runState === 'queued') {
+        statusBadge = '<span class="badge-queued">QUEUED</span>';
+      } else if (item.is_paused) {
+        statusBadge = '<span class="badge-failed">FAILED</span>';
+      } else {
+        statusBadge = '<span class="badge-active">SUCCESS</span>';
+      }
 
       const freqBadge = item.frequency === 'Weekly'
         ? '<span class="badge-weekly">Weekly</span>'
